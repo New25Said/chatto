@@ -42,7 +42,7 @@ let nickname = localStorage.getItem("nickname") || "";
 let currentChat = "public";
 let currentTarget = null;
 let allMessages = []; // Historial completo en el cliente
-let groupsList = [];  // Lista de grupos
+let unreadCounts = {}; // Contador de mensajes no leídos
 
 const nicknameModal = document.getElementById("nickname-modal");
 const usernameInput = document.getElementById("username");
@@ -55,7 +55,7 @@ const chatList = document.getElementById("chat-list");
 const chatTitle = document.getElementById("chat-title");
 const createGroupBtn = document.getElementById("create-group-btn");
 
-// Conexión y nickname
+// Esperar conexión antes de enviar nickname guardado
 socket.on("connect", () => {
   if (nickname) {
     socket.emit("set nickname", nickname);
@@ -65,7 +65,7 @@ socket.on("connect", () => {
   }
 });
 
-// Agregar mensaje al DOM
+// Función para agregar un mensaje al DOM
 function addMessage(msg){
   const li = document.createElement("li");
   li.className = "message " + (msg.name===nickname?"you":"other");
@@ -76,7 +76,7 @@ function addMessage(msg){
   messages.scrollTop = messages.scrollHeight;
 }
 
-// Renderizar según chat activo
+// Filtrar y renderizar mensajes según chat activo
 function renderMessages(){
   messages.innerHTML = "";
   allMessages.forEach(msg=>{
@@ -91,7 +91,7 @@ function renderMessages(){
   });
 }
 
-// Unirse con nickname
+// Unirse con nickname manual
 joinBtn.addEventListener("click", ()=>{
   const name = usernameInput.value.trim();
   if(name){
@@ -123,40 +123,60 @@ messageInput.addEventListener("keypress", e=>{
 messageInput.addEventListener("input", ()=>{
   socket.emit("typing",{type:currentChat,target:currentTarget});
 });
-
-socket.on("typing", ({name,type,target})=>{
-  // Mostrar solo si corresponde al chat actual
-  if(name !== nickname){
-    if(
-      (currentChat === "public" && type === "public") ||
-      (currentChat === "private" && type === "private" && target === nickname) ||
-      (currentChat === "group" && type === "group" && target === currentTarget)
-    ){
-      typingIndicator.textContent = `${name} está escribiendo...`;
-      clearTimeout(window.typingTimeout);
-      window.typingTimeout = setTimeout(()=>typingIndicator.textContent="",2000);
-    }
+socket.on("typing", data=>{
+  if(data.name!==nickname){
+    typingIndicator.textContent = `${data.name} está escribiendo...`;
+    clearTimeout(window.typingTimeout);
+    window.typingTimeout = setTimeout(()=>typingIndicator.textContent="",2000);
   }
 });
 
-// Historial inicial
+// Recibir historial inicial
 socket.on("chat history", history=>{
   allMessages = history;
   renderMessages();
 });
 
-// Nuevos mensajes
+// Recibir nuevos mensajes
 socket.on("chat message", msg=>{
-  // Guardar solo si es relevante para este usuario
-  if(
-    msg.type === "public" ||
-    (msg.type === "private" && (msg.name===nickname || msg.target===nickname)) ||
-    (msg.type === "group" && groupsList.includes(msg.target))
-  ){
-    allMessages.push(msg);
-    renderMessages();
+  allMessages.push(msg);
+
+  // Manejar mensajes no leídos
+  if (msg.type === "private" && msg.name !== nickname) {
+    if (currentChat !== "private" || currentTarget !== msg.name) {
+      unreadCounts[msg.name] = (unreadCounts[msg.name] || 0) + 1;
+      updateUnreadBadge(msg.name);
+    }
   }
+
+  if (msg.type === "group" && msg.name !== nickname) {
+    if (currentChat !== "group" || currentTarget !== msg.target) {
+      unreadCounts[msg.target] = (unreadCounts[msg.target] || 0) + 1;
+      updateUnreadBadge(msg.target);
+    }
+  }
+
+  renderMessages();
 });
+
+// Función para actualizar badges
+function updateUnreadBadge(nameOrGroup) {
+  const lis = chatList.querySelectorAll("li");
+  lis.forEach(li => {
+    if (li.textContent.startsWith(nameOrGroup)) {
+      const oldBadge = li.querySelector(".unread-badge");
+      if (oldBadge) oldBadge.remove();
+
+      const count = unreadCounts[nameOrGroup];
+      if (count > 0) {
+        const badge = document.createElement("span");
+        badge.className = "unread-badge";
+        badge.textContent = count;
+        li.appendChild(badge);
+      }
+    }
+  });
+}
 
 // Lista de usuarios
 socket.on("user list", users=>{
@@ -180,7 +200,6 @@ socket.on("user list", users=>{
 
 // Lista de grupos
 socket.on("group list", groups=>{
-  groupsList = groups;
   groups.forEach(group=>{
     const li=document.createElement("li");
     li.textContent=group;
@@ -205,9 +224,15 @@ function selectChat(type, target=null){
   currentChat = type;
   currentTarget = target;
   chatTitle.textContent = target || "General";
+
+  // Resetear contador de no leídos
+  if(target && unreadCounts[target]){
+    delete unreadCounts[target];
+    updateUnreadBadge(target);
+  }
+
   renderMessages();
 }
 </script>
-  <script src="notifications.js"></script>
 </body>
 </html>
