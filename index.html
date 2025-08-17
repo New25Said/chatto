@@ -4,35 +4,6 @@
 <meta charset="UTF-8">
 <title>💬 Chat WhatsApp Style</title>
 <link rel="stylesheet" href="styles.css">
-<style>
-  /* Mejor estilo para botón de imagen */
-  #image-btn {
-    background:#fff;
-    border:1px solid #ccc;
-    border-radius:5px;
-    padding:5px 10px;
-    cursor:pointer;
-    margin-left:5px;
-  }
-  #image-btn:hover {
-    background:#f0f0f0;
-  }
-  .chat-image {
-    max-width:150px;
-    max-height:150px;
-    border-radius:5px;
-    display:block;
-    margin-top:5px;
-  }
-  .unread-badge {
-    background:red;
-    color:white;
-    font-size:10px;
-    padding:2px 5px;
-    border-radius:50%;
-    margin-left:5px;
-  }
-</style>
 </head>
 <body>
 
@@ -50,13 +21,12 @@
       <span id="typing-indicator"></span>
     </div>
     <ul id="messages"></ul>
-    <div id="input-area">
-      <input id="message-input" placeholder="Escribe un mensaje..." autocomplete="off"/>
-      <input type="file" id="image-input" accept="image/*" style="display:none"/>
-      <button id="image-btn">📎</button>
-      <button id="send-btn">➤</button>
-      <div id="preview-area" style="display:none; margin-top:5px;"></div>
-    </div>
+<div id="input-area">
+  <input id="message-input" placeholder="Escribe un mensaje..." autocomplete="off"/>
+  <input type="file" id="image-input" accept="image/*" style="display:none"/>
+  <button id="image-btn">📎</button>
+  <button id="send-btn">➤</button>
+</div>
   </div>
 </div>
 
@@ -67,16 +37,14 @@
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
-<script src="notifications.js"></script>
 <script>
 const socket = io();
 
 let nickname = localStorage.getItem("nickname") || "";
 let currentChat = "public";
 let currentTarget = null;
-let allMessages = []; // Historial completo
-let unreadCounts = {}; // Contador de no leídos
-let pendingImage = null; // Imagen pendiente de enviar
+let allMessages = []; // Historial completo en el cliente
+let unreadCounts = {}; // Contador de mensajes no leídos
 
 const nicknameModal = document.getElementById("nickname-modal");
 const usernameInput = document.getElementById("username");
@@ -88,30 +56,36 @@ const typingIndicator = document.getElementById("typing-indicator");
 const chatList = document.getElementById("chat-list");
 const chatTitle = document.getElementById("chat-title");
 const createGroupBtn = document.getElementById("create-group-btn");
-const imageInput = document.getElementById("image-input");
+  const imageInput = document.getElementById("image-input");
 const imageBtn = document.getElementById("image-btn");
-const previewArea = document.getElementById("preview-area");
 
-// Abrir selector de archivos
+// Abrir selector de archivos al hacer clic en el botón 📎
 imageBtn.addEventListener("click", () => imageInput.click());
 
-// Previsualización de imagen
+// Cuando el usuario selecciona una imagen
 imageInput.addEventListener("change", () => {
   const file = imageInput.files[0];
   if (!file) return;
 
   const reader = new FileReader();
   reader.onload = () => {
-    pendingImage = reader.result;
-    previewArea.innerHTML = `<img src="${pendingImage}" class="chat-image">`;
-    previewArea.style.display = "block";
+    const dataURL = reader.result; // imagen en Base64
+
+    if (currentChat === "public") {
+      socket.emit("chat public", { type: "image", data: dataURL });
+    } else if (currentChat === "private") {
+      socket.emit("chat private", { target: currentTarget, text: "", type: "image", data: dataURL });
+    } else if (currentChat === "group") {
+      socket.emit("chat group", { groupName: currentTarget, text: "", type: "image", data: dataURL });
+    }
   };
   reader.readAsDataURL(file);
 
-  imageInput.value = "";
+  imageInput.value = ""; // resetear input
 });
 
-// Esperar conexión
+
+// Esperar conexión antes de enviar nickname guardado
 socket.on("connect", () => {
   if (nickname) {
     socket.emit("set nickname", nickname);
@@ -121,26 +95,30 @@ socket.on("connect", () => {
   }
 });
 
-// Agregar mensaje al DOM
+// Función para agregar un mensaje al DOM
 function addMessage(msg){
   const li = document.createElement("li");
   li.className = "message " + (msg.name===nickname?"you":"other");
 
   let content = `<span class="name">${msg.name}</span>`;
 
-  if(msg.image){
-    content += `<img src="${msg.image}" class="chat-image">`;
+  if(msg.image){ // si hay imagen
+    content += `<img src="${msg.image}" alt="imagen" class="chat-image"/>`;
   }
-  if(msg.text){
+
+  if(msg.text){ // si hay texto
     content += `<span class="text">${msg.text}</span>`;
   }
+
   content += `<span class="time">${new Date(msg.time).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>`;
+
   li.innerHTML = content;
   messages.appendChild(li);
   messages.scrollTop = messages.scrollHeight;
 }
 
-// Renderizar mensajes
+
+// Filtrar y renderizar mensajes según chat activo
 function renderMessages(){
   messages.innerHTML = "";
   allMessages.forEach(msg=>{
@@ -155,7 +133,7 @@ function renderMessages(){
   });
 }
 
-// Unirse con nickname
+// Unirse con nickname manual
 joinBtn.addEventListener("click", ()=>{
   const name = usernameInput.value.trim();
   if(name){
@@ -169,18 +147,13 @@ joinBtn.addEventListener("click", ()=>{
 // Enviar mensaje
 sendBtn.addEventListener("click", ()=>{
   const text = messageInput.value.trim();
-  if(!nickname) return;
+  if(!text || !nickname) return;
 
-  const msgData = { text, type:"text", image: pendingImage };
-
-  if(currentChat==="public") socket.emit("chat public", msgData);
-  else if(currentChat==="private") socket.emit("chat private",{target:currentTarget,...msgData});
-  else if(currentChat==="group") socket.emit("chat group",{groupName:currentTarget,...msgData});
+  if(currentChat==="public") socket.emit("chat public", text);
+  else if(currentChat==="private") socket.emit("chat private",{target:currentTarget,text});
+  else if(currentChat==="group") socket.emit("chat group",{groupName:currentTarget,text});
 
   messageInput.value="";
-  pendingImage = null;
-  previewArea.style.display="none";
-  previewArea.innerHTML="";
 });
 
 // Enter para enviar
@@ -200,23 +173,24 @@ socket.on("typing", data=>{
   }
 });
 
-// Recibir historial
+// Recibir historial inicial
 socket.on("chat history", history=>{
   allMessages = history;
   renderMessages();
 });
 
-// Recibir mensajes
+// Recibir nuevos mensajes
 socket.on("chat message", msg=>{
   allMessages.push(msg);
 
-  // Mensajes no leídos
+  // Manejar mensajes no leídos
   if (msg.type === "private" && msg.name !== nickname) {
     if (currentChat !== "private" || currentTarget !== msg.name) {
       unreadCounts[msg.name] = (unreadCounts[msg.name] || 0) + 1;
       updateUnreadBadge(msg.name);
     }
   }
+
   if (msg.type === "group" && msg.name !== nickname) {
     if (currentChat !== "group" || currentTarget !== msg.target) {
       unreadCounts[msg.target] = (unreadCounts[msg.target] || 0) + 1;
@@ -227,13 +201,14 @@ socket.on("chat message", msg=>{
   renderMessages();
 });
 
-// Actualizar badges
+// Función para actualizar badges
 function updateUnreadBadge(nameOrGroup) {
   const lis = chatList.querySelectorAll("li");
   lis.forEach(li => {
     if (li.textContent.startsWith(nameOrGroup)) {
       const oldBadge = li.querySelector(".unread-badge");
       if (oldBadge) oldBadge.remove();
+
       const count = unreadCounts[nameOrGroup];
       if (count > 0) {
         const badge = document.createElement("span");
@@ -292,6 +267,7 @@ function selectChat(type, target=null){
   currentTarget = target;
   chatTitle.textContent = target || "General";
 
+  // Resetear contador de no leídos
   if(target && unreadCounts[target]){
     delete unreadCounts[target];
     updateUnreadBadge(target);
@@ -300,5 +276,6 @@ function selectChat(type, target=null){
   renderMessages();
 }
 </script>
+  <script src="notifications.js"></script>
 </body>
 </html>
