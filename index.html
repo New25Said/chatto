@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>💬 Chat</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="chat-app">
+    <div id="sidebar">
+      <div id="sidebar-header">💬 Chats</div>
+      <div id="chat-list"></div>
+      <div id="new-group">
+        <input type="text" id="group-name" placeholder="Nuevo grupo..." />
+        <button onclick="createGroup()">➕</button>
+      </div>
+    </div>
+    <div id="main">
+      <div id="chat-header">
+        <span id="chat-title">Chat Público</span>
+      </div>
+      <div id="messages"></div>
+      <div id="input-area">
+        <input id="message-input" placeholder="Escribe un mensaje..." />
+        <button onclick="sendMessage()">➤</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    let currentChat = "public";
+    let nickname = "";
+
+    // pedir nickname
+    while (!nickname) {
+      nickname = prompt("Ingresa tu nickname:");
+    }
+    socket.emit("setNickname", nickname);
+
+    // mostrar chats
+    socket.on("chatList", chats => {
+      const list = document.getElementById("chat-list");
+      list.innerHTML = "";
+      chats.forEach(chat => {
+        const div = document.createElement("div");
+        div.className = "chat-item";
+        div.textContent = chat;
+        div.onclick = () => joinChat(chat);
+        list.appendChild(div);
+      });
+    });
+
+    // mostrar mensajes
+    socket.on("message", ({ chat, from, text }) => {
+      if (chat === currentChat) {
+        addMessage(from, text);
+      } else {
+        markUnread(chat);
+        notify(`${from} en ${chat}`, text);
+      }
+    });
+
+    function joinChat(chat) {
+      currentChat = chat;
+      document.getElementById("chat-title").textContent = chat;
+      document.getElementById("messages").innerHTML = "";
+      socket.emit("joinChat", chat);
+      clearUnread(chat);
+    }
+
+    function sendMessage() {
+      const input = document.getElementById("message-input");
+      const text = input.value.trim();
+      if (text) {
+        socket.emit("message", { chat: currentChat, from: nickname, text });
+        input.value = "";
+      }
+    }
+
+    function addMessage(from, text) {
+      const div = document.createElement("div");
+      div.className = "message";
+      div.innerHTML = `<strong>${from}:</strong> ${text}`;
+      document.getElementById("messages").appendChild(div);
+      document.getElementById("messages").scrollTop = document.getElementById("messages").scrollHeight;
+    }
+
+    function createGroup() {
+      const input = document.getElementById("group-name");
+      const name = input.value.trim();
+      if (name) {
+        socket.emit("createGroup", name);
+        input.value = "";
+      }
+    }
+
+    // 🔔 Notificaciones de escritorio
+    function notify(title, text) {
+      if (Notification.permission === "granted") {
+        new Notification(title, { body: text });
+      } else if (Notification.permission !== "denied") {
+        Notification.requestPermission().then(permission => {
+          if (permission === "granted") {
+            new Notification(title, { body: text });
+          }
+        });
+      }
+    }
+
+    // 🔴 Chats no leídos
+    function markUnread(chat) {
+      const items = document.querySelectorAll(".chat-item");
+      items.forEach(div => {
+        if (div.textContent === chat && chat !== currentChat) {
+          if (!div.classList.contains("unread")) {
+            div.classList.add("unread");
+          }
+        }
+      });
+    }
+    function clearUnread(chat) {
+      const items = document.querySelectorAll(".chat-item");
+      items.forEach(div => {
+        if (div.textContent === chat) {
+          div.classList.remove("unread");
+        }
+      });
+    }
+  </script>
+</body>
+</html>
