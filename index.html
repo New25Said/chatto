@@ -56,6 +56,34 @@ const typingIndicator = document.getElementById("typing-indicator");
 const chatList = document.getElementById("chat-list");
 const chatTitle = document.getElementById("chat-title");
 const createGroupBtn = document.getElementById("create-group-btn");
+  const imageInput = document.getElementById("image-input");
+const imageBtn = document.getElementById("image-btn");
+
+// Abrir selector de archivos al hacer clic en el botón 📎
+imageBtn.addEventListener("click", () => imageInput.click());
+
+// Cuando el usuario selecciona una imagen
+imageInput.addEventListener("change", () => {
+  const file = imageInput.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const dataURL = reader.result; // imagen en Base64
+
+    if (currentChat === "public") {
+      socket.emit("chat public", { type: "image", data: dataURL });
+    } else if (currentChat === "private") {
+      socket.emit("chat private", { target: currentTarget, text: "", type: "image", data: dataURL });
+    } else if (currentChat === "group") {
+      socket.emit("chat group", { groupName: currentTarget, text: "", type: "image", data: dataURL });
+    }
+  };
+  reader.readAsDataURL(file);
+
+  imageInput.value = ""; // resetear input
+});
+
 
 // Esperar conexión antes de enviar nickname guardado
 socket.on("connect", () => {
