@@ -1,4 +1,3 @@
-// server.js - Chat en tiempo real
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -9,11 +8,11 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Carpeta pública
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname)));
 
-// Historial de chat
 const HISTORY_FILE = path.join(__dirname, "chatHistory.json");
+
+// Cargar historial
 let chatHistory = [];
 if (fs.existsSync(HISTORY_FILE)) {
   try {
@@ -32,12 +31,13 @@ function saveHistory() {
 }
 
 io.on("connection", (socket) => {
-  console.log("✅ Usuario conectado:", socket.id);
+  console.log("✔ Usuario conectado:", socket.id);
 
+  // Establecer nickname
   socket.on("set nickname", (nickname) => {
     users[socket.id] = nickname;
     io.emit("user list", Object.values(users));
-    socket.emit("chat history", chatHistory);
+    socket.emit("chat history", chatHistory); // enviar historial
     socket.emit("group list", Object.keys(groups));
   });
 
@@ -70,8 +70,8 @@ io.on("connection", (socket) => {
       };
       chatHistory.push(msg);
       saveHistory();
-      socket.emit("chat message", msg);
-      io.to(targetId).emit("chat message", msg);
+      socket.emit("chat message", msg); // tú ves tu mensaje
+      io.to(targetId).emit("chat message", msg); // destinatario
     }
   });
 
@@ -88,6 +88,8 @@ io.on("connection", (socket) => {
       };
       chatHistory.push(msg);
       saveHistory();
+
+      // enviar solo a miembros
       Object.entries(users).forEach(([sid, nick]) => {
         if (groups[groupName].includes(nick)) {
           io.to(sid).emit("chat message", msg);
@@ -106,8 +108,9 @@ io.on("connection", (socket) => {
 
   // Indicador escribiendo
   socket.on("typing", ({ type, target }) => {
-    if (type === "public") socket.broadcast.emit("typing", users[socket.id]);
-    else if (type === "private" && target) {
+    if (type === "public") {
+      socket.broadcast.emit("typing", users[socket.id]);
+    } else if (type === "private" && target) {
       const targetId = Object.keys(users).find((id) => users[id] === target);
       if (targetId) io.to(targetId).emit("typing", users[socket.id]);
     } else if (type === "group" && target) {
@@ -118,6 +121,7 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Desconexión
   socket.on("disconnect", () => {
     console.log("❌ Usuario desconectado:", socket.id);
     delete users[socket.id];
@@ -126,4 +130,4 @@ io.on("connection", (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`🚀 Servidor listo en puerto ${PORT}`));
+server.listen(PORT, () => console.log(`✔ Servidor chat listo en puerto ${PORT}`));
