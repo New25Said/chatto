@@ -48,3 +48,31 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log("🚀 Servidor corriendo en http://localhost:" + PORT);
 });
+const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
+const path = require("path");
+
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
+
+// Servir la carpeta "public" (index.html, styles.css, client.js)
+app.use(express.static(path.join(__dirname, "public")));
+
+io.on("connection", (socket) => {
+  console.log("âœ… Un usuario se conectÃ³");
+
+  socket.on("chat message", (msg) => {
+    io.emit("chat message", msg);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("âŒ Un usuario se desconectÃ³");
+  });
+});
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`ðŸš€ Servidor escuchando en puerto ${PORT}`);
+});
