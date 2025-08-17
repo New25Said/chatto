@@ -1,7 +1,7 @@
 // notifications.js
 
 // Crear objeto Audio
-const notificationSound = new Audio("/notify.mp3");
+const notificationSound = new Audio("https://ia801505.us.archive.org/10/items/hangouts_sfx/hangouts_message.mp3");
 
 // Función para mostrar notificación
 function notifyUser(title, body) {
