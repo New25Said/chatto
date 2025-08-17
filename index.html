@@ -21,12 +21,12 @@
       <span id="typing-indicator"></span>
     </div>
     <ul id="messages"></ul>
-<div id="input-area">
-  <input id="message-input" placeholder="Escribe un mensaje..." autocomplete="off"/>
-  <input type="file" id="image-input" accept="image/*" style="display:none"/>
-  <button id="image-btn">📎</button>
-  <button id="send-btn">➤</button>
-</div>
+    <div id="input-area">
+      <input id="message-input" placeholder="Escribe un mensaje..." autocomplete="off"/>
+      <input type="file" id="image-input" accept="image/*" style="display:none"/>
+      <button id="image-btn">📎</button>
+      <button id="send-btn">➤</button>
+    </div>
   </div>
 </div>
 
@@ -45,6 +45,7 @@ let currentChat = "public";
 let currentTarget = null;
 let allMessages = []; // Historial completo en el cliente
 let unreadCounts = {}; // Contador de mensajes no leídos
+let pendingImage = null; // Imagen pendiente de enviar
 
 const nicknameModal = document.getElementById("nickname-modal");
 const usernameInput = document.getElementById("username");
@@ -56,34 +57,25 @@ const typingIndicator = document.getElementById("typing-indicator");
 const chatList = document.getElementById("chat-list");
 const chatTitle = document.getElementById("chat-title");
 const createGroupBtn = document.getElementById("create-group-btn");
-  const imageInput = document.getElementById("image-input");
+const imageInput = document.getElementById("image-input");
 const imageBtn = document.getElementById("image-btn");
 
 // Abrir selector de archivos al hacer clic en el botón 📎
 imageBtn.addEventListener("click", () => imageInput.click());
 
-// Cuando el usuario selecciona una imagen
+// Guardar imagen pendiente
 imageInput.addEventListener("change", () => {
   const file = imageInput.files[0];
   if (!file) return;
 
   const reader = new FileReader();
   reader.onload = () => {
-    const dataURL = reader.result; // imagen en Base64
-
-    if (currentChat === "public") {
-      socket.emit("chat public", { type: "image", data: dataURL });
-    } else if (currentChat === "private") {
-      socket.emit("chat private", { target: currentTarget, text: "", type: "image", data: dataURL });
-    } else if (currentChat === "group") {
-      socket.emit("chat group", { groupName: currentTarget, text: "", type: "image", data: dataURL });
-    }
+    pendingImage = reader.result; // almacenar temporalmente
   };
   reader.readAsDataURL(file);
 
   imageInput.value = ""; // resetear input
 });
-
 
 // Esperar conexión antes de enviar nickname guardado
 socket.on("connect", () => {
@@ -117,7 +109,6 @@ function addMessage(msg){
   messages.scrollTop = messages.scrollHeight;
 }
 
-
 // Filtrar y renderizar mensajes según chat activo
 function renderMessages(){
   messages.innerHTML = "";
@@ -147,11 +138,24 @@ joinBtn.addEventListener("click", ()=>{
 // Enviar mensaje
 sendBtn.addEventListener("click", ()=>{
   const text = messageInput.value.trim();
-  if(!text || !nickname) return;
 
-  if(currentChat==="public") socket.emit("chat public", text);
-  else if(currentChat==="private") socket.emit("chat private",{target:currentTarget,text});
-  else if(currentChat==="group") socket.emit("chat group",{groupName:currentTarget,text});
+  if(!nickname && !pendingImage) return; // nada que enviar
+
+  // Enviar imagen si hay pendiente
+  if(pendingImage){
+    if(currentChat==="public") socket.emit("chat public", { type:"image", data: pendingImage });
+    else if(currentChat==="private") socket.emit("chat private", { target: currentTarget, text:"", type:"image", data: pendingImage });
+    else if(currentChat==="group") socket.emit("chat group", { groupName: currentTarget, text:"", type:"image", data: pendingImage });
+
+    pendingImage = null; // limpiar pendiente
+  }
+
+  // Enviar texto
+  if(text){
+    if(currentChat==="public") socket.emit("chat public", text);
+    else if(currentChat==="private") socket.emit("chat private",{target:currentTarget,text});
+    else if(currentChat==="group") socket.emit("chat group",{groupName:currentTarget,text});
+  }
 
   messageInput.value="";
 });
@@ -276,6 +280,6 @@ function selectChat(type, target=null){
   renderMessages();
 }
 </script>
-  <script src="notifications.js"></script>
+<script src="notifications.js"></script>
 </body>
 </html>
