@@ -10,6 +10,27 @@ const io = new Server(server);
 
 app.use(express.static(path.join(__dirname)));
 
+// Permitir parsear JSON en POST
+app.use(express.json());
+
+// Ruta para resetear todo el historial y grupos
+app.post("/reset", (req, res) => {
+  // Vaciar historial
+  chatHistory = [];
+  saveHistory();
+
+  // Vaciar grupos
+  groups = {};
+
+  // Actualizar listas de usuarios y grupos a los clientes
+  io.emit("user list", Object.values(users));
+  io.emit("group list", Object.keys(groups));
+
+  console.log("⚠️ Chat reseteado manualmente");
+  res.sendStatus(200);
+});
+
+
 const HISTORY_FILE = path.join(__dirname, "chatHistory.json");
 
 // Cargar historial
