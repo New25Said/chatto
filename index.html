@@ -4,6 +4,51 @@
 <meta charset="UTF-8">
 <title>💬 Chat WhatsApp Style</title>
 <link rel="stylesheet" href="styles.css">
+<style>
+/* --- Mejoras visuales para imágenes --- */
+#image-preview-container {
+  display: flex;
+  align-items: center;
+  margin-left: 5px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 2px;
+  background: #f0f0f0;
+}
+
+.preview-image {
+  width: 50px;
+  height: 50px;
+  object-fit: cover;
+  border-radius: 5px;
+  margin-right: 5px;
+}
+
+#remove-image-btn {
+  border: none;
+  background: #ff5c5c;
+  color: white;
+  font-weight: bold;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+#image-btn {
+  background: #34b7f1;
+  border: none;
+  color: white;
+  font-size: 18px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+#image-btn:hover {
+  background: #0b93d5;
+}
+</style>
 </head>
 <body>
 
@@ -21,10 +66,18 @@
       <span id="typing-indicator"></span>
     </div>
     <ul id="messages"></ul>
+
     <div id="input-area">
       <input id="message-input" placeholder="Escribe un mensaje..." autocomplete="off"/>
       <input type="file" id="image-input" accept="image/*" style="display:none"/>
       <button id="image-btn">📎</button>
+
+      <!-- Contenedor de previsualización -->
+      <div id="image-preview-container" style="display:none">
+        <img id="image-preview" src="" alt="Previsualización" class="preview-image"/>
+        <button id="remove-image-btn">✖</button>
+      </div>
+
       <button id="send-btn">➤</button>
     </div>
   </div>
@@ -59,22 +112,65 @@ const chatTitle = document.getElementById("chat-title");
 const createGroupBtn = document.getElementById("create-group-btn");
 const imageInput = document.getElementById("image-input");
 const imageBtn = document.getElementById("image-btn");
+const imagePreviewContainer = document.getElementById("image-preview-container");
+const imagePreview = document.getElementById("image-preview");
+const removeImageBtn = document.getElementById("remove-image-btn");
 
 // Abrir selector de archivos al hacer clic en el botón 📎
 imageBtn.addEventListener("click", () => imageInput.click());
 
-// Guardar imagen pendiente
+// Previsualizar imagen seleccionada
 imageInput.addEventListener("change", () => {
   const file = imageInput.files[0];
   if (!file) return;
 
   const reader = new FileReader();
   reader.onload = () => {
-    pendingImage = reader.result; // almacenar temporalmente
+    pendingImage = reader.result;
+    imagePreview.src = pendingImage;
+    imagePreviewContainer.style.display = "flex";
   };
   reader.readAsDataURL(file);
 
   imageInput.value = ""; // resetear input
+});
+
+// Eliminar imagen pendiente
+removeImageBtn.addEventListener("click", () => {
+  pendingImage = null;
+  imagePreview.src = "";
+  imagePreviewContainer.style.display = "none";
+});
+
+// Enviar mensaje (texto + imagen si hay)
+function sendMessage() {
+  const text = messageInput.value.trim();
+  if (!text && !pendingImage) return;
+  if (!nickname) return;
+
+  let msgData = {};
+  if (pendingImage) {
+    msgData.image = pendingImage;
+    msgData.text = text || "";
+  } else {
+    msgData.text = text;
+  }
+
+  if (currentChat==="public") socket.emit("chat public", msgData);
+  else if (currentChat==="private") socket.emit("chat private",{target:currentTarget,...msgData});
+  else if (currentChat==="group") socket.emit("chat group",{groupName:currentTarget,...msgData});
+
+  messageInput.value="";
+  pendingImage = null;
+  imagePreviewContainer.style.display = "none";
+}
+
+// Botón enviar
+sendBtn.addEventListener("click", sendMessage);
+
+// Enter para enviar
+messageInput.addEventListener("keypress", e=>{
+  if(e.key==="Enter") sendMessage();
 });
 
 // Esperar conexión antes de enviar nickname guardado
@@ -133,36 +229,6 @@ joinBtn.addEventListener("click", ()=>{
     nicknameModal.style.display="none";
     socket.emit("set nickname", nickname);
   }
-});
-
-// Enviar mensaje
-sendBtn.addEventListener("click", ()=>{
-  const text = messageInput.value.trim();
-
-  if(!nickname && !pendingImage) return; // nada que enviar
-
-  // Enviar imagen si hay pendiente
-  if(pendingImage){
-    if(currentChat==="public") socket.emit("chat public", { type:"image", data: pendingImage });
-    else if(currentChat==="private") socket.emit("chat private", { target: currentTarget, text:"", type:"image", data: pendingImage });
-    else if(currentChat==="group") socket.emit("chat group", { groupName: currentTarget, text:"", type:"image", data: pendingImage });
-
-    pendingImage = null; // limpiar pendiente
-  }
-
-  // Enviar texto
-  if(text){
-    if(currentChat==="public") socket.emit("chat public", text);
-    else if(currentChat==="private") socket.emit("chat private",{target:currentTarget,text});
-    else if(currentChat==="group") socket.emit("chat group",{groupName:currentTarget,text});
-  }
-
-  messageInput.value="";
-});
-
-// Enter para enviar
-messageInput.addEventListener("keypress", e=>{
-  if(e.key==="Enter") sendBtn.click();
 });
 
 // Indicador escribiendo
