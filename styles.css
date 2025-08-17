@@ -40,3 +40,13 @@ body, html{margin:0;padding:0;height:100%;font-family:Arial,sans-serif}
   margin-top: 4px;
   object-fit: cover;
 }
+#image-btn {
+  border: none;       /* sin borde */
+  background: none;   /* sin fondo */
+  padding: 0;         /* opcional, ajusta según icono */
+  cursor: pointer;    /* mano al pasar encima */
+}
+
+#image-btn:hover {
+  opacity: 0.8;       /* efecto al pasar el mouse */
+}
