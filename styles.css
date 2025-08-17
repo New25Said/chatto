@@ -23,3 +23,13 @@ body, html{margin:0;padding:0;height:100%;font-family:Arial,sans-serif}
 #nickname-modal input{padding:10px 12px;border-radius:20px;border:1px solid #ccc;outline:none}
 #nickname-modal button{padding:10px 16px;border:none;background:#075e54;color:#fff;border-radius:20px;cursor:pointer}
 #nickname-modal button:hover{filter:brightness(1.1)}
+.unread-badge {
+  display: inline-block;
+  background: red;
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+  border-radius: 50%;
+  padding: 2px 6px;
+  margin-left: 8px;
+}
