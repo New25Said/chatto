@@ -9,9 +9,7 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 app.use(express.static(path.join(__dirname)));
-
-// Permitir parsear JSON en POST
-app.use(express.json());
+app.use(express.json()); // Para parsear JSON en POST
 
 // Ruta para resetear todo el historial y grupos
 app.post("/reset", (req, res) => {
@@ -29,7 +27,6 @@ app.post("/reset", (req, res) => {
   console.log("⚠️ Chat reseteado manualmente");
   res.sendStatus(200);
 });
-
 
 const HISTORY_FILE = path.join(__dirname, "chatHistory.json");
 
@@ -91,7 +88,7 @@ io.on("connection", (socket) => {
       };
       chatHistory.push(msg);
       saveHistory();
-      socket.emit("chat message", msg);       // yo veo mi mensaje
+      socket.emit("chat message", msg); // tú ves tu mensaje
       io.to(targetId).emit("chat message", msg); // destinatario
     }
   });
@@ -129,21 +126,16 @@ io.on("connection", (socket) => {
 
   // Indicador escribiendo
   socket.on("typing", ({ type, target }) => {
-    const name = users[socket.id];
-    if (!name) return;
-
     if (type === "public") {
-      socket.broadcast.emit("typing", { name, type, target: null });
+      socket.broadcast.emit("typing", { name: users[socket.id], type, target: null });
     } else if (type === "private" && target) {
       const targetId = Object.keys(users).find((id) => users[id] === target);
-      if (targetId) io.to(targetId).emit("typing", { name, type, target });
+      if (targetId) io.to(targetId).emit("typing", { name: users[socket.id], type, target });
     } else if (type === "group" && target) {
-      if (groups[target]) {
-        groups[target].forEach(nick => {
-          const sid = Object.keys(users).find(id => users[id] === nick);
-          if (sid && sid !== socket.id) io.to(sid).emit("typing", { name, type, target });
-        });
-      }
+      groups[target].forEach((nick) => {
+        const sid = Object.keys(users).find((id) => users[id] === nick);
+        if (sid && sid !== socket.id) io.to(sid).emit("typing", { name: users[socket.id], type, target });
+      });
     }
   });
 
