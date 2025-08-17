@@ -11,20 +11,6 @@ const io = new Server(server);
 app.use(express.static(path.join(__dirname)));
 app.use(express.json()); // Para parsear JSON en POST
 
-// Ruta para resetear todo el historial y grupos
-app.post("/reset", (req, res) => {
-  chatHistory = [];
-  saveHistory();
-
-  groups = {};
-
-  io.emit("user list", Object.values(users));
-  io.emit("group list", Object.keys(groups));
-
-  console.log("⚠️ Chat reseteado manualmente");
-  res.sendStatus(200);
-});
-
 const HISTORY_FILE = path.join(__dirname, "chatHistory.json");
 
 // Cargar historial
@@ -45,74 +31,100 @@ function saveHistory() {
   fs.writeFileSync(HISTORY_FILE, JSON.stringify(chatHistory, null, 2));
 }
 
+// Ruta para resetear todo el historial y grupos
+app.post("/reset", (req, res) => {
+  // Vaciar historial
+  chatHistory = [];
+  saveHistory();
+
+  // Vaciar grupos
+  groups = {};
+
+  // Actualizar listas de usuarios y grupos a los clientes
+  io.emit("user list", Object.values(users));
+  io.emit("group list", Object.keys(groups));
+
+  console.log("âš ï¸ Chat reseteado manualmente");
+  res.sendStatus(200);
+});
+
 io.on("connection", (socket) => {
-  console.log("✔ Usuario conectado:", socket.id);
+  console.log("âœ” Usuario conectado:", socket.id);
 
   // Establecer nickname
   socket.on("set nickname", (nickname) => {
     users[socket.id] = nickname;
     io.emit("user list", Object.values(users));
-    socket.emit("chat history", chatHistory);
+    socket.emit("chat history", chatHistory); // enviar historial
     socket.emit("group list", Object.keys(groups));
   });
 
-  // Mensajes públicos
-  socket.on("chat public", (data) => {
-    const msg = {
+// Mensajes pÃºblicos
+socket.on("chat public", (msg) => {
+  const isImage = typeof msg === "object" && msg.type === "image";
+  const message = {
+    id: socket.id,
+    name: users[socket.id],
+    text: isImage ? "" : msg,
+    image: isImage ? msg.data : null,
+    time: Date.now(),
+    type: "public",
+    target: null,
+  };
+  chatHistory.push(message);
+  saveHistory();
+  io.emit("chat message", message);
+});
+
+
+// Mensajes privados
+socket.on("chat private", (msg) => {
+  const target = msg.target;
+  const targetId = Object.keys(users).find((id) => users[id] === target);
+  if (targetId) {
+    const isImage = msg.type === "image";
+    const message = {
       id: socket.id,
       name: users[socket.id],
-      text: data.text || "",
-      image: data.image || null,
+      text: isImage ? "" : msg.text,
+      image: isImage ? msg.data : null,
       time: Date.now(),
-      type: "public",
-      target: null,
+      type: "private",
+      target,
     };
-    chatHistory.push(msg);
+    chatHistory.push(message);
     saveHistory();
-    io.emit("chat message", msg);
-  });
+    socket.emit("chat message", message); // tÃº ves tu mensaje
+    io.to(targetId).emit("chat message", message); // destinatario
+  }
+});
 
-  // Mensajes privados
-  socket.on("chat private", ({ target, text, image }) => {
-    const targetId = Object.keys(users).find((id) => users[id] === target);
-    if (targetId) {
-      const msg = {
-        id: socket.id,
-        name: users[socket.id],
-        text: text || "",
-        image: image || null,
-        time: Date.now(),
-        type: "private",
-        target,
-      };
-      chatHistory.push(msg);
-      saveHistory();
-      socket.emit("chat message", msg);
-      io.to(targetId).emit("chat message", msg);
-    }
-  });
 
-  // Mensajes de grupo
-  socket.on("chat group", ({ groupName, text, image }) => {
-    if (groups[groupName] && groups[groupName].includes(users[socket.id])) {
-      const msg = {
-        id: socket.id,
-        name: users[socket.id],
-        text: text || "",
-        image: image || null,
-        time: Date.now(),
-        type: "group",
-        target: groupName,
-      };
-      chatHistory.push(msg);
-      saveHistory();
-      Object.entries(users).forEach(([sid, nick]) => {
-        if (groups[groupName].includes(nick)) {
-          io.to(sid).emit("chat message", msg);
-        }
-      });
-    }
-  });
+// Mensajes de grupo
+socket.on("chat group", (msg) => {
+  const groupName = msg.groupName;
+  if (groups[groupName] && groups[groupName].includes(users[socket.id])) {
+    const isImage = msg.type === "image";
+    const message = {
+      id: socket.id,
+      name: users[socket.id],
+      text: isImage ? "" : msg.text,
+      image: isImage ? msg.data : null,
+      time: Date.now(),
+      type: "group",
+      target: groupName,
+    };
+    chatHistory.push(message);
+    saveHistory();
+
+    Object.entries(users).forEach(([sid, nick]) => {
+      if (groups[groupName].includes(nick)) {
+        io.to(sid).emit("chat message", message);
+      }
+    });
+  }
+});
+
 
   // Crear grupo
   socket.on("create group", ({ groupName, members }) => {
@@ -137,13 +149,13 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Desconexión
+  // DesconexiÃ³n
   socket.on("disconnect", () => {
-    console.log("✖ Usuario desconectado:", socket.id);
+    console.log("âœ– Usuario desconectado:", socket.id);
     delete users[socket.id];
     io.emit("user list", Object.values(users));
   });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`✔ Servidor chat listo en puerto ${PORT}`));
+server.listen(PORT, () => console.log(`âœ” Servidor chat listo en puerto ${PORT}`));
