@@ -70,7 +70,7 @@ io.on("connection", (socket) => {
       };
       chatHistory.push(msg);
       saveHistory();
-      socket.emit("chat message", msg); // tú ves tu mensaje
+      socket.emit("chat message", msg);       // yo veo mi mensaje
       io.to(targetId).emit("chat message", msg); // destinatario
     }
   });
@@ -108,22 +108,27 @@ io.on("connection", (socket) => {
 
   // Indicador escribiendo
   socket.on("typing", ({ type, target }) => {
+    const name = users[socket.id];
+    if (!name) return;
+
     if (type === "public") {
-      socket.broadcast.emit("typing", users[socket.id]);
+      socket.broadcast.emit("typing", { name, type, target: null });
     } else if (type === "private" && target) {
       const targetId = Object.keys(users).find((id) => users[id] === target);
-      if (targetId) io.to(targetId).emit("typing", users[socket.id]);
+      if (targetId) io.to(targetId).emit("typing", { name, type, target });
     } else if (type === "group" && target) {
-      groups[target].forEach((nick) => {
-        const sid = Object.keys(users).find((id) => users[id] === nick);
-        if (sid && sid !== socket.id) io.to(sid).emit("typing", users[socket.id]);
-      });
+      if (groups[target]) {
+        groups[target].forEach(nick => {
+          const sid = Object.keys(users).find(id => users[id] === nick);
+          if (sid && sid !== socket.id) io.to(sid).emit("typing", { name, type, target });
+        });
+      }
     }
   });
 
   // Desconexión
   socket.on("disconnect", () => {
-    console.log("❌ Usuario desconectado:", socket.id);
+    console.log("✖ Usuario desconectado:", socket.id);
     delete users[socket.id];
     io.emit("user list", Object.values(users));
   });
