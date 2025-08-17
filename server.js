@@ -59,62 +59,72 @@ io.on("connection", (socket) => {
     socket.emit("group list", Object.keys(groups));
   });
 
-  // Mensajes públicos
-  socket.on("chat public", (text) => {
-    const msg = {
+// Mensajes públicos
+socket.on("chat public", (msg) => {
+  const isImage = typeof msg === "object" && msg.type === "image";
+  const message = {
+    id: socket.id,
+    name: users[socket.id],
+    text: isImage ? "" : msg,
+    image: isImage ? msg.data : null,
+    time: Date.now(),
+    type: "public",
+    target: null,
+  };
+  chatHistory.push(message);
+  saveHistory();
+  io.emit("chat message", message);
+});
+
+
+// Mensajes privados
+socket.on("chat private", (msg) => {
+  const target = msg.target;
+  const targetId = Object.keys(users).find((id) => users[id] === target);
+  if (targetId) {
+    const isImage = msg.type === "image";
+    const message = {
       id: socket.id,
       name: users[socket.id],
-      text,
+      text: isImage ? "" : msg.text,
+      image: isImage ? msg.data : null,
       time: Date.now(),
-      type: "public",
-      target: null,
+      type: "private",
+      target,
     };
-    chatHistory.push(msg);
+    chatHistory.push(message);
     saveHistory();
-    io.emit("chat message", msg);
-  });
+    socket.emit("chat message", message); // tú ves tu mensaje
+    io.to(targetId).emit("chat message", message); // destinatario
+  }
+});
 
-  // Mensajes privados
-  socket.on("chat private", ({ target, text }) => {
-    const targetId = Object.keys(users).find((id) => users[id] === target);
-    if (targetId) {
-      const msg = {
-        id: socket.id,
-        name: users[socket.id],
-        text,
-        time: Date.now(),
-        type: "private",
-        target,
-      };
-      chatHistory.push(msg);
-      saveHistory();
-      socket.emit("chat message", msg); // tú ves tu mensaje
-      io.to(targetId).emit("chat message", msg); // destinatario
-    }
-  });
 
-  // Mensajes de grupo
-  socket.on("chat group", ({ groupName, text }) => {
-    if (groups[groupName] && groups[groupName].includes(users[socket.id])) {
-      const msg = {
-        id: socket.id,
-        name: users[socket.id],
-        text,
-        time: Date.now(),
-        type: "group",
-        target: groupName,
-      };
-      chatHistory.push(msg);
-      saveHistory();
+// Mensajes de grupo
+socket.on("chat group", (msg) => {
+  const groupName = msg.groupName;
+  if (groups[groupName] && groups[groupName].includes(users[socket.id])) {
+    const isImage = msg.type === "image";
+    const message = {
+      id: socket.id,
+      name: users[socket.id],
+      text: isImage ? "" : msg.text,
+      image: isImage ? msg.data : null,
+      time: Date.now(),
+      type: "group",
+      target: groupName,
+    };
+    chatHistory.push(message);
+    saveHistory();
 
-      // enviar solo a miembros
-      Object.entries(users).forEach(([sid, nick]) => {
-        if (groups[groupName].includes(nick)) {
-          io.to(sid).emit("chat message", msg);
-        }
-      });
-    }
-  });
+    Object.entries(users).forEach(([sid, nick]) => {
+      if (groups[groupName].includes(nick)) {
+        io.to(sid).emit("chat message", message);
+      }
+    });
+  }
+});
+
 
   // Crear grupo
   socket.on("create group", ({ groupName, members }) => {
