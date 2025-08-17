@@ -41,12 +41,18 @@ body, html{margin:0;padding:0;height:100%;font-family:Arial,sans-serif}
   object-fit: cover;
 }
 #image-btn {
-  border: none;       /* sin borde */
-  background: none;   /* sin fondo */
-  padding: 0;         /* opcional, ajusta según icono */
-  cursor: pointer;    /* mano al pasar encima */
+  border: none;
+  background: none;
+  width: 36px;      /* ancho fijo */
+  height: 36px;     /* alto fijo */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 50%; /* opcional, que sea redondo */
 }
 
 #image-btn:hover {
-  opacity: 0.8;       /* efecto al pasar el mouse */
+  background: rgba(0,0,0,0.05); /* ligero efecto al pasar mouse */
 }
+
