@@ -99,12 +99,24 @@ socket.on("connect", () => {
 function addMessage(msg){
   const li = document.createElement("li");
   li.className = "message " + (msg.name===nickname?"you":"other");
-  li.innerHTML = `<span class="name">${msg.name}</span>
-                  <span class="text">${msg.text}</span>
-                  <span class="time">${new Date(msg.time).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>`;
+
+  let content = `<span class="name">${msg.name}</span>`;
+
+  if(msg.image){ // si hay imagen
+    content += `<img src="${msg.image}" alt="imagen" class="chat-image"/>`;
+  }
+
+  if(msg.text){ // si hay texto
+    content += `<span class="text">${msg.text}</span>`;
+  }
+
+  content += `<span class="time">${new Date(msg.time).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>`;
+
+  li.innerHTML = content;
   messages.appendChild(li);
   messages.scrollTop = messages.scrollHeight;
 }
+
 
 // Filtrar y renderizar mensajes según chat activo
 function renderMessages(){
