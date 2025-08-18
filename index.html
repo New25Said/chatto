@@ -21,13 +21,19 @@
       <span id="typing-indicator"></span>
     </div>
     <ul id="messages"></ul>
-<div id="input-area">
-  <input id="message-input" placeholder="Escribe un mensaje..." autocomplete="off"/>
-  <input type="file" id="image-input" accept="image/*" style="display:none"/>
-  <button id="image-btn">📎</button>
-  <button id="send-btn">➤</button>
-</div>
+    <div id="input-area">
+      <input id="message-input" placeholder="Escribe un mensaje..." autocomplete="off"/>
+      <input type="file" id="image-input" accept="image/*" style="display:none"/>
+      <button id="image-btn">📎</button>
+      <button id="sticker-btn">😎</button> <!-- NUEVO botón stickers -->
+      <button id="send-btn">➤</button>
+    </div>
   </div>
+</div>
+
+<!-- Panel stickers -->
+<div id="sticker-panel" style="display:none;">
+  <div id="sticker-gallery"></div>
 </div>
 
 <!-- Modal nickname -->
@@ -56,10 +62,51 @@ const typingIndicator = document.getElementById("typing-indicator");
 const chatList = document.getElementById("chat-list");
 const chatTitle = document.getElementById("chat-title");
 const createGroupBtn = document.getElementById("create-group-btn");
-  const imageInput = document.getElementById("image-input");
+const imageInput = document.getElementById("image-input");
 const imageBtn = document.getElementById("image-btn");
 
-// Abrir selector de archivos al hacer clic en el botón 📎
+const stickerBtn = document.getElementById("sticker-btn");
+const stickerPanel = document.getElementById("sticker-panel");
+const stickerGallery = document.getElementById("sticker-gallery");
+
+// Lista de stickers de ejemplo (emoji.gg)
+const STICKERS = [
+  "https://emoji.gg/assets/emoji/9162_BlobCatSmooch.png",
+  "https://emoji.gg/assets/emoji/4611-peepositdown.png",
+  "https://emoji.gg/assets/emoji/6350_hyperpeek.png",
+  "https://emoji.gg/assets/emoji/7777-happydance.gif"
+];
+
+// Rellenar galería
+STICKERS.forEach(url => {
+  const img = document.createElement("img");
+  img.src = url;
+  img.addEventListener("click", () => {
+    sendSticker(url);
+    stickerPanel.style.display = "none";
+  });
+  stickerGallery.appendChild(img);
+});
+
+// Mostrar/ocultar panel de stickers
+stickerBtn.addEventListener("click", () => {
+  stickerPanel.style.display = (stickerPanel.style.display === "none" ? "block" : "none");
+});
+
+// Función para enviar sticker como imagen
+function sendSticker(url){
+  const msg = { type: "image", data: url };
+
+  if (currentChat === "public") {
+    socket.emit("chat public", msg);
+  } else if (currentChat === "private") {
+    socket.emit("chat private", { target: currentTarget, text: "", type: "image", data: url });
+  } else if (currentChat === "group") {
+    socket.emit("chat group", { groupName: currentTarget, text: "", type: "image", data: url });
+  }
+}
+
+// Abrir selector de archivos al hacer clic en 📎
 imageBtn.addEventListener("click", () => imageInput.click());
 
 // Cuando el usuario selecciona una imagen
@@ -83,7 +130,6 @@ imageInput.addEventListener("change", () => {
 
   imageInput.value = ""; // resetear input
 });
-
 
 // Esperar conexión antes de enviar nickname guardado
 socket.on("connect", () => {
@@ -116,7 +162,6 @@ function addMessage(msg){
   messages.appendChild(li);
   messages.scrollTop = messages.scrollHeight;
 }
-
 
 // Filtrar y renderizar mensajes según chat activo
 function renderMessages(){
@@ -276,6 +321,6 @@ function selectChat(type, target=null){
   renderMessages();
 }
 </script>
-  <script src="notifications.js"></script>
+<script src="notifications.js"></script>
 </body>
 </html>
