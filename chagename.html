@@ -11,11 +11,9 @@
     *{box-sizing:border-box}
     html,body{height:100%;margin:0;font-family:system-ui, Arial, sans-serif;background:var(--claro);color:var(--texto)}
     #app{display:flex;height:100vh}
-    /* Sidebar */
     #sidebar{width:300px;max-width:35vw;background:#eaeaea;border-right:1px solid #ddd;display:flex;flex-direction:column}
     #sidebar-header{background:var(--verde);color:#fff;padding:12px 14px;display:flex;align-items:center;justify-content:space-between}
     #sidebar-header .title{font-weight:700}
-    #sidebar-header .name{opacity:.9;font-size:.9rem}
     #search{padding:10px}
     #search input{width:100%;padding:10px;border:1px solid #ccc;border-radius:10px}
     #contacts{flex:1;overflow:auto}
@@ -24,11 +22,8 @@
     .avatar{width:36px;height:36px;border-radius:999px;background:#ccc}
     .meta{display:flex;flex-direction:column;font-size:.9rem}
     .meta .n{font-weight:600}
-
-    /* Chat */
     #chat{flex:1;display:flex;flex-direction:column;background:url('https://i.imgur.com/cWnQjJo.png') repeat;}
     #chat-header{background:var(--verde);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:10px}
-    #chat-header .room{font-weight:700}
     #messages{flex:1;overflow:auto;padding:18px;display:flex;flex-direction:column;gap:8px}
     .msg{max-width:70%;padding:8px 10px;border-radius:10px;box-shadow:0 1px 1px rgba(0,0,0,.06)}
     .me{align-self:flex-end;background:#d9fdd3}
@@ -37,8 +32,6 @@
     #composer input{flex:1;padding:10px;border:1px solid #ccc;border-radius:999px}
     #composer button{padding:10px 14px;border:none;border-radius:999px;background:var(--verde);color:#fff;font-weight:600;cursor:pointer}
     #composer button:hover{background:var(--verde-osc)}
-
-    /* Dialog */
     dialog{border:none;border-radius:14px;padding:0;box-shadow:0 10px 30px rgba(0,0,0,.2)}
     .modal{padding:16px;width:min(92vw,420px)}
     .row{display:flex;gap:10px;align-items:center;margin:10px 0}
@@ -46,13 +39,11 @@
     .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}
     .btn{padding:10px 14px;border-radius:10px;border:1px solid #ccc;background:#fff;cursor:pointer}
     .btn.primary{background:var(--verde);color:#fff;border-color:var(--verde)}
-
     .pill{background:#ffffff25;border:1px solid #ffffff50;border-radius:999px;padding:6px 10px;font-size:.85rem}
   </style>
 </head>
 <body>
 <div id="app">
-  <!-- Sidebar -->
   <aside id="sidebar">
     <div id="sidebar-header">
       <div class="title">Chats</div>
@@ -64,8 +55,6 @@
     <div id="search"><input id="q" placeholder="Buscar contacto" /></div>
     <div id="contacts"></div>
   </aside>
-
-  <!-- Chat -->
   <main id="chat">
     <div id="chat-header">
       <div class="avatar" aria-hidden></div>
@@ -78,8 +67,6 @@
     </form>
   </main>
 </div>
-
-<!-- Modal Cambiar nombre -->
 <dialog id="nameDialog">
   <form method="dialog" class="modal" id="nameForm">
     <h3 style="margin:0 0 6px">Cambiar nombre</h3>
@@ -93,102 +80,42 @@
     </div>
   </form>
 </dialog>
-
 <script>
-  // ===== UTIL: Persistencia de nombre =====
   const NAME_KEY = 'chat_name_v2';
-
-  function getQueryName(){
-    const p = new URLSearchParams(location.search);
-    const n = p.get('name') || p.get('nick') || p.get('usuario');
-    return n ? decodeURIComponent(n.trim()) : '';
-  }
-
-  function sanitizeName(n){
-    return n.replace(/[\n\r\t]/g,' ').replace(/\s+/g,' ').trim().slice(0,30);
-  }
-
-  function loadName(){
-    const fromQuery = getQueryName();
-    if(fromQuery){
-      const clean = sanitizeName(fromQuery);
-      localStorage.setItem(NAME_KEY, clean);
-      return clean;
-    }
-    const stored = localStorage.getItem(NAME_KEY);
-    return stored && stored.trim() ? stored : '';
-  }
-
-  function saveName(name){
-    const clean = sanitizeName(name || '');
-    if(!clean) return;
-    localStorage.setItem(NAME_KEY, clean);
-    updateNameUI(clean);
-    // \u{1F50A} Si usas Socket.IO, emite el nuevo nombre aquí
-    // if(window.io && window.socket){ socket.emit('setName', clean); }
-  }
-
+  function sanitizeName(n){ return n.replace(/[\n\r\t]/g,' ').replace(/\s+/g,' ').trim().slice(0,30); }
   function updateNameUI(name){
     const el = document.getElementById('currentName');
     if(el) el.textContent = name || 'Anónimo';
     document.title = `💬 Chat — ${name || 'Anónimo'}`;
   }
-
-  // ===== Poblado de contactos (demo) =====
-  const contactsEl = document.getElementById('contacts');
-  const sampleContacts = ['General','Soporte','Memes','Anuncios'];
-  contactsEl.innerHTML = sampleContacts.map(c=>`<div class="contact"><div class="avatar"></div><div class="meta"><span class="n">${c}</span><span class="s">Último mensaje • ahora</span></div></div>`).join('');
-
-  // ===== Mensajería local (demo) =====
-  const messages = document.getElementById('messages');
-  function pushMsg(text, me=false){
-    const div = document.createElement('div');
-    div.className = `msg ${me?'me':'other'}`;
-    div.textContent = text;
-    messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
+  function saveName(name){
+    const clean = sanitizeName(name);
+    if(!clean) return;
+    localStorage.setItem(NAME_KEY, clean);
+    updateNameUI(clean);
   }
-
-  document.getElementById('composer').addEventListener('submit', (e)=>{
-    e.preventDefault();
-    const input = document.getElementById('text');
-    const txt = input.value.trim();
-    if(!txt) return;
-    pushMsg(txt, true);
-    input.value='';
-  });
-
-  // ===== Cambiar nombre: UI =====
-  const dlg = document.getElementById('nameDialog');
-  const inputName = document.getElementById('nameInput');
+  function loadName(){
+    const stored = localStorage.getItem(NAME_KEY);
+    return stored && stored.trim() ? stored : '';
+  }
   document.getElementById('btnChange').addEventListener('click',()=>{
-    inputName.value = localStorage.getItem(NAME_KEY) || '';
+    const dlg = document.getElementById('nameDialog');
+    const inputName = document.getElementById('nameInput');
+    inputName.value = loadName();
     dlg.showModal();
     inputName.focus();
+    document.getElementById('saveName').onclick = ()=>{
+      const n = inputName.value.trim();
+      if(!n) return;
+      saveName(n);
+      dlg.close();
+    };
   });
-  document.getElementById('saveName').addEventListener('click', (e)=>{
-    e.preventDefault();
-    const n = sanitizeName(inputName.value);
-    if(!n){ inputName.focus(); return; }
-    saveName(n);
-    dlg.close();
-  });
-
-  // ===== Primera carga =====
   (function init(){
-    let name = loadName();
-    if(!name){
-      // Si no hay nombre guardado, preguntar de forma sencilla (sin inspector)
-      const guess = prompt('Escribe tu nombre visible:', '');
-      name = sanitizeName(guess || '');
-      if(name) localStorage.setItem(NAME_KEY, name);
-    }
-    updateNameUI(name || 'Anónimo');
+    const name = loadName() || prompt('Escribe tu nombre visible:', '');
+    if(name) saveName(name);
+    updateNameUI(name);
   })();
-
-  // ===== Enlace rápido para amigos sin inspector =====
-  // Puedes compartir una URL como: https://tu-chat.com/index.html?name=Pepe%20Gomez
-  // Al abrirla, el nombre se guardará automáticamente.
 </script>
 </body>
 </html>
