@@ -72,4 +72,123 @@
       <div class="room">General</div>
     </div>
     <div id="messages"></div>
-    <form id="composer
+    <form id="composer" autocomplete="off">
+      <input id="text" placeholder="Escribe un mensaje" />
+      <button type="submit">Enviar</button>
+    </form>
+  </main>
+</div>
+
+<!-- Modal Cambiar nombre -->
+<dialog id="nameDialog">
+  <form method="dialog" class="modal" id="nameForm">
+    <h3 style="margin:0 0 6px">Cambiar nombre</h3>
+    <p style="margin:0 0 8px;font-size:.95rem;color:#555">Este es el nombre que verán los demás en el chat.</p>
+    <div class="row">
+      <input id="nameInput" placeholder="Tu nombre" maxlength="30" />
+    </div>
+    <div class="actions">
+      <button class="btn" value="cancel">Cancelar</button>
+      <button class="btn primary" id="saveName" value="default">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+  // ===== UTIL: Persistencia de nombre =====
+  const NAME_KEY = 'chat_name_v2';
+
+  function getQueryName(){
+    const p = new URLSearchParams(location.search);
+    const n = p.get('name') || p.get('nick') || p.get('usuario');
+    return n ? decodeURIComponent(n.trim()) : '';
+  }
+
+  function sanitizeName(n){
+    return n.replace(/[\n\r\t]/g,' ').replace(/\s+/g,' ').trim().slice(0,30);
+  }
+
+  function loadName(){
+    const fromQuery = getQueryName();
+    if(fromQuery){
+      const clean = sanitizeName(fromQuery);
+      localStorage.setItem(NAME_KEY, clean);
+      return clean;
+    }
+    const stored = localStorage.getItem(NAME_KEY);
+    return stored && stored.trim() ? stored : '';
+  }
+
+  function saveName(name){
+    const clean = sanitizeName(name || '');
+    if(!clean) return;
+    localStorage.setItem(NAME_KEY, clean);
+    updateNameUI(clean);
+    // \u{1F50A} Si usas Socket.IO, emite el nuevo nombre aquí
+    // if(window.io && window.socket){ socket.emit('setName', clean); }
+  }
+
+  function updateNameUI(name){
+    const el = document.getElementById('currentName');
+    if(el) el.textContent = name || 'Anónimo';
+    document.title = `💬 Chat — ${name || 'Anónimo'}`;
+  }
+
+  // ===== Poblado de contactos (demo) =====
+  const contactsEl = document.getElementById('contacts');
+  const sampleContacts = ['General','Soporte','Memes','Anuncios'];
+  contactsEl.innerHTML = sampleContacts.map(c=>`<div class="contact"><div class="avatar"></div><div class="meta"><span class="n">${c}</span><span class="s">Último mensaje • ahora</span></div></div>`).join('');
+
+  // ===== Mensajería local (demo) =====
+  const messages = document.getElementById('messages');
+  function pushMsg(text, me=false){
+    const div = document.createElement('div');
+    div.className = `msg ${me?'me':'other'}`;
+    div.textContent = text;
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  document.getElementById('composer').addEventListener('submit', (e)=>{
+    e.preventDefault();
+    const input = document.getElementById('text');
+    const txt = input.value.trim();
+    if(!txt) return;
+    pushMsg(txt, true);
+    input.value='';
+  });
+
+  // ===== Cambiar nombre: UI =====
+  const dlg = document.getElementById('nameDialog');
+  const inputName = document.getElementById('nameInput');
+  document.getElementById('btnChange').addEventListener('click',()=>{
+    inputName.value = localStorage.getItem(NAME_KEY) || '';
+    dlg.showModal();
+    inputName.focus();
+  });
+  document.getElementById('saveName').addEventListener('click', (e)=>{
+    e.preventDefault();
+    const n = sanitizeName(inputName.value);
+    if(!n){ inputName.focus(); return; }
+    saveName(n);
+    dlg.close();
+  });
+
+  // ===== Primera carga =====
+  (function init(){
+    let name = loadName();
+    if(!name){
+      // Si no hay nombre guardado, preguntar de forma sencilla (sin inspector)
+      const guess = prompt('Escribe tu nombre visible:', '');
+      name = sanitizeName(guess || '');
+      if(name) localStorage.setItem(NAME_KEY, name);
+    }
+    updateNameUI(name || 'Anónimo');
+  })();
+
+  // ===== Enlace rápido para amigos sin inspector =====
+  // Puedes compartir una URL como: https://tu-chat.com/index.html?name=Pepe%20Gomez
+  // Al abrirla, el nombre se guardará automáticamente.
+</script>
+</body>
+</html>
