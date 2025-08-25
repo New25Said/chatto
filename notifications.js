@@ -1,7 +1,7 @@
 // notifications.js
 
 // URL del sonido de notificación
-const notificationSound = new Audio("https://ia801505.us.archive.org/10/items/hangouts_sfx/hangouts_message.mp3");
+const notificationSound = new Audio("whatsapp-bass-boosted.mp3");
 
 // Escuchar nuevos mensajes del socket
 if (typeof socket !== "undefined") {
