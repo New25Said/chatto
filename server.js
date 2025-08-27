@@ -26,6 +26,7 @@ if (fs.existsSync(HISTORY_FILE)) {
 // Usuarios y grupos
 let users = {}; // socket.id -> nickname
 let groups = {}; // groupName -> [nicknames]
+let bannedUsers = new Set(); // nicks baneados
 
 function saveHistory() {
   fs.writeFileSync(HISTORY_FILE, JSON.stringify(chatHistory, null, 2));
@@ -51,6 +52,11 @@ io.on("connection", (socket) => {
   console.log("✅ Usuario conectado:", socket.id);
 
   socket.on("set nickname", (nickname) => {
+    if (bannedUsers.has(nickname)) {
+      socket.emit("banned", "Has sido baneado del chat.");
+      socket.disconnect();
+      return;
+    }
     users[socket.id] = nickname;
     io.emit("user list", Object.values(users));
     socket.emit("chat history", chatHistory);
@@ -114,6 +120,29 @@ io.on("connection", (socket) => {
           io.to(sid).emit("chat message", message);
         }
       });
+    }
+  });
+
+  // ✨ Cambiar nombre de un usuario
+  socket.on("rename user", ({ oldName, newName }) => {
+    const userId = Object.keys(users).find((id) => users[id] === oldName);
+    if (userId) {
+      users[userId] = newName;
+      io.emit("user list", Object.values(users));
+      io.emit("system message", `${oldName} ahora se llama ${newName}`);
+    }
+  });
+
+  // ✨ Banear usuario
+  socket.on("ban user", (nickname) => {
+    const userId = Object.keys(users).find((id) => users[id] === nickname);
+    if (userId) {
+      bannedUsers.add(nickname);
+      io.to(userId).emit("banned", "Has sido baneado del chat.");
+      io.sockets.sockets.get(userId).disconnect();
+      delete users[userId];
+      io.emit("user list", Object.values(users));
+      io.emit("system message", `${nickname} fue baneado.`);
     }
   });
 
