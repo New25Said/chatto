@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Usuarios Registrados</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    h1 { margin-bottom: 15px; }
+    ul { list-style: none; padding: 0; }
+    li { 
+      background: #f0f0f0; 
+      margin: 5px 0; 
+      padding: 10px; 
+      border-radius: 6px; 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+    }
+    input[type="text"] {
+      padding: 5px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      margin-right: 10px;
+    }
+    button {
+      padding: 5px 8px;
+      margin-left: 5px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .save { background: #075e54; color: white; }
+    .save:hover { background: #0b8f6e; }
+    .delete { background: #d9534f; color: white; }
+    .delete:hover { background: #c9302c; }
+    .ban { background: #f0ad4e; color: white; }
+    .ban:hover { background: #ec971f; }
+    .banned { text-decoration: line-through; color: red; }
+  </style>
+</head>
+<body>
+  <h1>Usuarios Registrados</h1>
+  <ul id="user-list"></ul>
+
+  <script>
+    const userList = document.getElementById("user-list");
+
+    // Cargar usuarios
+    let users = JSON.parse(localStorage.getItem("users")) || [];
+
+    // Si los usuarios están guardados como ["Ana","Pedro"]
+    // Los convertimos a objetos {name:"Ana", banned:false}
+    users = users.map(u => typeof u === "string" ? { name: u, banned: false } : u);
+
+    function renderUsers() {
+      userList.innerHTML = "";
+
+      if (users.length === 0) {
+        userList.innerHTML = "<li>No hay usuarios registrados</li>";
+        return;
+      }
+
+      users.forEach((user, index) => {
+        const li = document.createElement("li");
+
+        // Campo de edición
+        const input = document.createElement("input");
+        input.type = "text";
+        input.value = user.name;
+        if (user.banned) input.classList.add("banned");
+
+        // Botón Guardar
+        const saveBtn = document.createElement("button");
+        saveBtn.textContent = "Guardar";
+        saveBtn.classList.add("save");
+        saveBtn.onclick = () => {
+          users[index].name = input.value.trim() || users[index].name;
+          localStorage.setItem("users", JSON.stringify(users));
+          renderUsers();
+        };
+
+        // Botón Eliminar
+        const deleteBtn = document.createElement("button");
+        deleteBtn.textContent = "Eliminar";
+        deleteBtn.classList.add("delete");
+        deleteBtn.onclick = () => {
+          users.splice(index, 1);
+          localStorage.setItem("users", JSON.stringify(users));
+          renderUsers();
+        };
+
+        // Botón Banear
+        const banBtn = document.createElement("button");
+        banBtn.textContent = user.banned ? "Desbanear" : "Banear";
+        banBtn.classList.add("ban");
+        banBtn.onclick = () => {
+          users[index].banned = !users[index].banned;
+          localStorage.setItem("users", JSON.stringify(users));
+          renderUsers();
+        };
+
+        li.appendChild(input);
+        li.appendChild(saveBtn);
+        li.appendChild(deleteBtn);
+        li.appendChild(banBtn);
+
+        userList.appendChild(li);
+      });
+    }
+
+    renderUsers();
+  </script>
+</body>
+</html>
