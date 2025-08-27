@@ -46,12 +46,19 @@
   <script>
     const userList = document.getElementById("user-list");
 
-    // Cargar usuarios
+    // Cargar usuarios del localStorage
     let users = JSON.parse(localStorage.getItem("users")) || [];
 
-    // Si los usuarios están guardados como ["Ana","Pedro"]
-    // Los convertimos a objetos {name:"Ana", banned:false}
-    users = users.map(u => typeof u === "string" ? { name: u, banned: false } : u);
+    // 🔥 Convertir strings en objetos {name, banned}
+    users = users.map(u => {
+      if (typeof u === "string") {
+        return { name: u, banned: false };
+      }
+      return u;
+    });
+
+    // Guardar la conversión para que quede estable
+    localStorage.setItem("users", JSON.stringify(users));
 
     function renderUsers() {
       userList.innerHTML = "";
@@ -64,13 +71,13 @@
       users.forEach((user, index) => {
         const li = document.createElement("li");
 
-        // Campo de edición
+        // Campo editable
         const input = document.createElement("input");
         input.type = "text";
         input.value = user.name;
         if (user.banned) input.classList.add("banned");
 
-        // Botón Guardar
+        // Guardar cambios
         const saveBtn = document.createElement("button");
         saveBtn.textContent = "Guardar";
         saveBtn.classList.add("save");
@@ -80,7 +87,7 @@
           renderUsers();
         };
 
-        // Botón Eliminar
+        // Eliminar usuario
         const deleteBtn = document.createElement("button");
         deleteBtn.textContent = "Eliminar";
         deleteBtn.classList.add("delete");
@@ -90,7 +97,7 @@
           renderUsers();
         };
 
-        // Botón Banear
+        // Banear/Desbanear
         const banBtn = document.createElement("button");
         banBtn.textContent = user.banned ? "Desbanear" : "Banear";
         banBtn.classList.add("ban");
