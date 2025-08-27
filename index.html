@@ -56,11 +56,12 @@ const typingIndicator = document.getElementById("typing-indicator");
 const chatList = document.getElementById("chat-list");
 const chatTitle = document.getElementById("chat-title");
 const createGroupBtn = document.getElementById("create-group-btn");
-  const imageInput = document.getElementById("image-input");
-const imageBtn = document.getElementById("image-btn");
+const fileInput = document.getElementById("file-input");
+const fileBtn = document.getElementById("image-btn");
 
 // Abrir selector de archivos al hacer clic en el botón 📎
-imageBtn.addEventListener("click", () => imageInput.click());
+fileBtn.addEventListener("click", () => fileInput.click());
+
 
 // Cuando el usuario selecciona una imagen
 imageInput.addEventListener("change", () => {
