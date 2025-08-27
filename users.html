@@ -1,112 +1,226 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Usuarios Registrados</title>
+  <meta charset="utf-8" />
+  <title>Usuarios registrados</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <script src="/socket.io/socket.io.js"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 20px;
-      background: #f4f4f9;
-    }
-    h1 {
-      color: #333;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 15px;
-    }
-    th, td {
-      border: 1px solid #ccc;
-      padding: 10px;
-      text-align: left;
-    }
-    th {
-      background: #eee;
-    }
-    button {
-      padding: 5px 10px;
-      margin-right: 5px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    .rename {
-      background: #4caf50;
-      color: white;
-    }
-    .ban {
-      background: #e53935;
-      color: white;
-    }
+    body{font-family:Arial,Helvetica,sans-serif;background:#f5f6fb;padding:20px;color:#222}
+    h1{margin:0 0 12px}
+    table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e1e4ea;border-radius:6px;overflow:hidden}
+    th,td{padding:10px;border-bottom:1px solid #f0f2f6;text-align:left}
+    th{background:#f7f8fb;font-weight:600}
+    tr:last-child td{border-bottom:none}
+    .actions button{margin-right:6px;padding:6px 10px;border-radius:5px;border:0;cursor:pointer}
+    .btn-rename{background:#2ea44f;color:#fff}
+    .btn-rename:hover{filter:brightness(.95)}
+    .status-online{color:#0b8457;font-weight:600}
+    .status-offline{color:#8b9aa5}
+    .baneado{color:#d9534f;text-decoration:line-through}
+    .note{margin:10px 0;color:#666;font-size:14px}
+    .small{font-size:12px;color:#888}
   </style>
 </head>
 <body>
-  <h1>Usuarios Registrados</h1>
-  <table>
+  <h1>Usuarios registrados</h1>
+  <div class="note">Aquí aparecen los usuarios registrados (localStorage) y se indica si están <span class="small">online</span>. Puedes renombrarlos — si están conectados el servidor también recibirá el cambio.</div>
+
+  <table aria-live="polite">
     <thead>
       <tr>
         <th>Nombre</th>
+        <th>Estado</th>
         <th>Acciones</th>
       </tr>
     </thead>
-    <tbody id="userTableBody">
-      <!-- Aquí van los usuarios -->
+    <tbody id="usersBody">
+      <tr><td colspan="3">Cargando...</td></tr>
     </tbody>
   </table>
 
-  <script>
-    function loadUsers() {
-      let users = JSON.parse(localStorage.getItem("users") || "[]");
-      let tbody = document.getElementById("userTableBody");
-      tbody.innerHTML = "";
+<script>
+(() => {
+  const usersBody = document.getElementById('usersBody');
+  const socket = io(); // requiere que /socket.io esté disponible (mismo dominio)
 
-      users.forEach((user, index) => {
-        let row = document.createElement("tr");
+  // estado runtime de quiénes están online (set de nombres)
+  let onlineSet = new Set();
 
-        // Nombre
-        let nameCell = document.createElement("td");
-        nameCell.textContent = user;
-        row.appendChild(nameCell);
+  // lista local de "usuarios registrados" como objetos { name: string, banned?: bool }
+  let registered = [];
 
-        // Acciones
-        let actionsCell = document.createElement("td");
-
-        // Botón renombrar
-        let renameBtn = document.createElement("button");
-        renameBtn.textContent = "Renombrar";
-        renameBtn.className = "rename";
-        renameBtn.onclick = () => {
-          let newName = prompt("Nuevo nombre para " + user + ":", user);
-          if (newName && newName.trim() !== "") {
-            users[index] = newName.trim();
-            localStorage.setItem("users", JSON.stringify(users));
-            loadUsers();
-          }
-        };
-        actionsCell.appendChild(renameBtn);
-
-        // Botón banear
-        let banBtn = document.createElement("button");
-        banBtn.textContent = "Banear";
-        banBtn.className = "ban";
-        banBtn.onclick = () => {
-          if (confirm("¿Seguro que deseas banear a " + user + "?")) {
-            users.splice(index, 1); // eliminar
-            localStorage.setItem("users", JSON.stringify(users));
-            loadUsers();
-          }
-        };
-        actionsCell.appendChild(banBtn);
-
-        row.appendChild(actionsCell);
-        tbody.appendChild(row);
+  // normaliza localStorage:
+  function loadLocalUsers() {
+    let raw = localStorage.getItem('users');
+    if (!raw) {
+      registered = [];
+      localStorage.setItem('users', JSON.stringify(registered));
+      return;
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) { registered = []; return; }
+      registered = parsed.map(u => {
+        if (typeof u === 'string') return { name: u, banned: false };
+        if (u && typeof u === 'object' && 'name' in u) return { name: String(u.name), banned: !!u.banned };
+        return { name: String(u), banned: false };
       });
+      // dedupe by name
+      const seen = new Set();
+      registered = registered.filter(r => {
+        if (!r.name || r.name.trim()==='') return false;
+        if (seen.has(r.name)) return false;
+        seen.add(r.name);
+        return true;
+      });
+      localStorage.setItem('users', JSON.stringify(registered));
+    } catch (e) {
+      console.warn('Error parseando localStorage.users:', e);
+      registered = [];
+      localStorage.setItem('users', JSON.stringify(registered));
+    }
+  }
+
+  // si no hay usuarios locales, pedir al servidor /users y sembrar
+  function seedFromServerIfEmpty() {
+    if (registered.length > 0) return Promise.resolve();
+    return fetch('/users').then(r => {
+      if (!r.ok) throw new Error('no /users');
+      return r.json();
+    }).then(obj => {
+      const serverNames = Array.isArray(obj) ? obj : Object.values(obj || {});
+      if (serverNames.length > 0) {
+        registered = serverNames.map(n => ({ name: n, banned: false }));
+        localStorage.setItem('users', JSON.stringify(registered));
+      }
+    }).catch(err => {
+      // servidor inaccesible o no disponible: no pasa nada
+      console.warn('No se pudo obtener /users:', err);
+    });
+  }
+
+  // renderizar tabla
+  function render() {
+    usersBody.innerHTML = '';
+    if (registered.length === 0) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td colspan="3">No hay usuarios registrados.</td>`;
+      usersBody.appendChild(tr);
+      return;
     }
 
-    // Cargar al abrir
-    loadUsers();
-  </script>
+    registered.forEach((u, idx) => {
+      const tr = document.createElement('tr');
+
+      const tdName = document.createElement('td');
+      tdName.textContent = u.name;
+      if (u.banned) tdName.classList.add('baneado');
+
+      const tdStatus = document.createElement('td');
+      tdStatus.textContent = onlineSet.has(u.name) ? 'Online' : 'Offline';
+      tdStatus.className = onlineSet.has(u.name) ? 'status-online' : 'status-offline';
+
+      const tdActions = document.createElement('td');
+      tdActions.className = 'actions';
+
+      const renameBtn = document.createElement('button');
+      renameBtn.className = 'btn-rename';
+      renameBtn.textContent = 'Renombrar';
+      renameBtn.onclick = () => handleRename(idx);
+
+      tdActions.appendChild(renameBtn);
+
+      tr.appendChild(tdName);
+      tr.appendChild(tdStatus);
+      tr.appendChild(tdActions);
+
+      usersBody.appendChild(tr);
+    });
+  }
+
+  // renombrar en localStorage y avisar al servidor (si corresponde)
+  function handleRename(index) {
+    const oldName = registered[index].name;
+    const newName = prompt('Nuevo nombre para "' + oldName + '":', oldName);
+    if (!newName) return;
+    const nameTrim = newName.trim();
+    if (nameTrim === '') { alert('Nombre vacío.'); return; }
+    if (registered.some((r,i) => i !== index && r.name === nameTrim)) {
+      alert('Ya existe un usuario con ese nombre. Usa otro.');
+      return;
+    }
+
+    // actualizar local
+    registered[index].name = nameTrim;
+    localStorage.setItem('users', JSON.stringify(registered));
+    render();
+
+    // avisar al servidor para que actualice al usuario si está online
+    // emitimos el evento que el server espera: "rename user" con { oldName, newName }
+    try {
+      socket.emit('rename user', { oldName, newName: nameTrim });
+    } catch (e) {
+      console.warn('No se pudo emitir rename user (socket):', e);
+    }
+  }
+
+  // actualizar onlineSet y re-render
+  function setOnlineFromArray(arr) {
+    onlineSet = new Set(arr || []);
+    render();
+  }
+
+  // inicialización
+  async function init() {
+    loadLocalUsers();
+    await seedFromServerIfEmpty();
+    render();
+  }
+
+  // socket listeners
+  socket.on('connect', () => {
+    // pedir lista por si el servidor la emite sólo por demanda
+    socket.emit('request user list'); // no hace daño si el server no lo maneja
+  });
+
+  // el server original usa "user list" para emitir la lista (ver server.js)
+  socket.on('user list', (usersArray) => {
+    // usersArray suele ser Array de nombres => convertimos a set
+    setOnlineFromArray(usersArray || []);
+  });
+
+  // si el servidor emite "users" (objeto id->name) también lo respetamos
+  socket.on('users', (usersObj) => {
+    const arr = Array.isArray(usersObj) ? usersObj : Object.values(usersObj || {});
+    setOnlineFromArray(arr);
+  });
+
+  // cuando el servidor envía un message de sistema podemos refrescar
+  socket.on('system message', () => {
+    // pedir lista nueva al servidor (si está disponible)
+    fetch('/users').then(r => r.json()).then(obj => {
+      const arr = Array.isArray(obj) ? obj : Object.values(obj || {});
+      setOnlineFromArray(arr);
+    }).catch(()=>{/* ignore */});
+  });
+
+  // si el servidor responde que un usuario fue renombrado/banneado, actualizamos la UI al recibir "user list"
+  socket.on('chat history', () => {
+    // trigger opcional: re-seed si local vacía
+    seedFromServerIfEmpty().then(render);
+  });
+
+  // inicio
+  init();
+
+  // Exponer helpers en consola para debug rápido
+  window.__users_admin = {
+    registered,
+    reload: () => { loadLocalUsers(); seedFromServerIfEmpty().then(render); },
+    seedFromServer: () => seedFromServerIfEmpty().then(render)
+  };
+})();
+</script>
 </body>
 </html>
