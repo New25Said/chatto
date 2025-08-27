@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Usuarios Registrados</title>
+  <title>Usuario Actual</title>
   <link rel="stylesheet" href="styles.css">
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; }
@@ -32,91 +32,68 @@
     }
     .save { background: #075e54; color: white; }
     .save:hover { background: #0b8f6e; }
-    .delete { background: #d9534f; color: white; }
-    .delete:hover { background: #c9302c; }
     .ban { background: #f0ad4e; color: white; }
     .ban:hover { background: #ec971f; }
     .banned { text-decoration: line-through; color: red; }
   </style>
 </head>
 <body>
-  <h1>Usuarios Registrados</h1>
+  <h1>Usuario Actual</h1>
   <ul id="user-list"></ul>
 
   <script>
     const userList = document.getElementById("user-list");
 
-    // Cargar usuarios del localStorage
-    let users = JSON.parse(localStorage.getItem("users")) || [];
+    // Obtener el nickname actual
+    let nickname = localStorage.getItem("nickname");
 
-    // 🔥 Convertir strings en objetos {name, banned}
-    users = users.map(u => {
-      if (typeof u === "string") {
-        return { name: u, banned: false };
-      }
-      return u;
-    });
+    if (!nickname) {
+      userList.innerHTML = "<li>No hay usuario registrado</li>";
+    } else {
+      // Creamos objeto para poder banear/editar
+      let user = { name: nickname, banned: false };
 
-    // Guardar la conversión para que quede estable
-    localStorage.setItem("users", JSON.stringify(users));
+      const li = document.createElement("li");
 
-    function renderUsers() {
-      userList.innerHTML = "";
+      const input = document.createElement("input");
+      input.type = "text";
+      input.value = user.name;
 
-      if (users.length === 0) {
-        userList.innerHTML = "<li>No hay usuarios registrados</li>";
-        return;
-      }
+      // Botón guardar
+      const saveBtn = document.createElement("button");
+      saveBtn.textContent = "Guardar";
+      saveBtn.classList.add("save");
+      saveBtn.onclick = () => {
+        user.name = input.value.trim() || user.name;
+        localStorage.setItem("nickname", user.name);
+        render();
+      };
 
-      users.forEach((user, index) => {
-        const li = document.createElement("li");
+      // Botón banear/desbanear
+      const banBtn = document.createElement("button");
+      banBtn.textContent = user.banned ? "Desbanear" : "Banear";
+      banBtn.classList.add("ban");
+      banBtn.onclick = () => {
+        user.banned = !user.banned;
+        if (user.banned) {
+          input.classList.add("banned");
+          banBtn.textContent = "Desbanear";
+        } else {
+          input.classList.remove("banned");
+          banBtn.textContent = "Banear";
+        }
+      };
 
-        // Campo editable
-        const input = document.createElement("input");
-        input.type = "text";
-        input.value = user.name;
-        if (user.banned) input.classList.add("banned");
+      li.appendChild(input);
+      li.appendChild(saveBtn);
+      li.appendChild(banBtn);
 
-        // Guardar cambios
-        const saveBtn = document.createElement("button");
-        saveBtn.textContent = "Guardar";
-        saveBtn.classList.add("save");
-        saveBtn.onclick = () => {
-          users[index].name = input.value.trim() || users[index].name;
-          localStorage.setItem("users", JSON.stringify(users));
-          renderUsers();
-        };
-
-        // Eliminar usuario
-        const deleteBtn = document.createElement("button");
-        deleteBtn.textContent = "Eliminar";
-        deleteBtn.classList.add("delete");
-        deleteBtn.onclick = () => {
-          users.splice(index, 1);
-          localStorage.setItem("users", JSON.stringify(users));
-          renderUsers();
-        };
-
-        // Banear/Desbanear
-        const banBtn = document.createElement("button");
-        banBtn.textContent = user.banned ? "Desbanear" : "Banear";
-        banBtn.classList.add("ban");
-        banBtn.onclick = () => {
-          users[index].banned = !users[index].banned;
-          localStorage.setItem("users", JSON.stringify(users));
-          renderUsers();
-        };
-
-        li.appendChild(input);
-        li.appendChild(saveBtn);
-        li.appendChild(deleteBtn);
-        li.appendChild(banBtn);
-
-        userList.appendChild(li);
-      });
+      userList.appendChild(li);
     }
 
-    renderUsers();
+    function render() {
+      location.reload();
+    }
   </script>
 </body>
 </html>
