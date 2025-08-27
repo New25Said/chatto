@@ -23,7 +23,7 @@
     <div id="input-area">
       <input id="message-input" placeholder="Escribe un mensaje..." autocomplete="off"/>
       <input type="file" id="file-input" style="display:none"/>
-      <button id="image-btn">📎</button>
+      <button id="file-btn">📎</button>
       <button id="send-btn">➤</button>
     </div>
   </div>
@@ -54,11 +54,10 @@ const sendBtn = document.getElementById("send-btn");
 const typingIndicator = document.getElementById("typing-indicator");
 const chatList = document.getElementById("chat-list");
 const chatTitle = document.getElementById("chat-title");
-const createGroupBtn = document.getElementById("create-group-btn");
 const fileInput = document.getElementById("file-input");
-const fileBtn = document.getElementById("image-btn");
+const fileBtn = document.getElementById("file-btn");
 
-// Abrir selector de archivos al hacer clic en 📎
+// Abrir selector de archivos al hacer clic en el botón 📎
 fileBtn.addEventListener("click", () => fileInput.click());
 
 // Cuando el usuario selecciona un archivo
@@ -68,20 +67,19 @@ fileInput.addEventListener("change", () => {
 
   const reader = new FileReader();
   reader.onload = () => {
-    const dataURL = reader.result; // archivo en Base64
-    const payload = {
+    const dataURL = reader.result;
+
+    const msg = {
       type: "file",
-      data: dataURL,
-      name: file.name,
-      mime: file.type
+      file: { data: dataURL, name: file.name, mime: file.type }
     };
 
-    if (currentChat === "public") {
-      socket.emit("chat public", payload);
-    } else if (currentChat === "private") {
-      socket.emit("chat private", { target: currentTarget, text: "", ...payload });
-    } else if (currentChat === "group") {
-      socket.emit("chat group", { groupName: currentTarget, text: "", ...payload });
+    if(currentChat === "public"){
+      socket.emit("chat public", msg);
+    } else if(currentChat === "private"){
+      socket.emit("chat private", { target: currentTarget, ...msg });
+    } else if(currentChat === "group"){
+      socket.emit("chat group", { groupName: currentTarget, ...msg });
     }
   };
   reader.readAsDataURL(file);
@@ -102,13 +100,12 @@ socket.on("connect", () => {
 function addMessage(msg){
   const li = document.createElement("li");
   li.className = "message " + (msg.name===nickname?"you":"other");
-
   let content = `<span class="name">${msg.name}</span>`;
 
   if(msg.image){ 
     content += `<img src="${msg.image}" alt="imagen" class="chat-image"/>`;
-  } else if(msg.type === "file" && msg.data){
-    content += `<a href="${msg.data}" download="${msg.name}" class="file-link">${msg.name}</a>`;
+  } else if(msg.file){ 
+    content += `<a href="${msg.file.data}" download="${msg.file.name}" class="file-link">${msg.file.name}</a>`;
   }
 
   if(msg.text){ 
@@ -116,7 +113,6 @@ function addMessage(msg){
   }
 
   content += `<span class="time">${new Date(msg.time).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>`;
-
   li.innerHTML = content;
   messages.appendChild(li);
   messages.scrollTop = messages.scrollHeight;
@@ -133,7 +129,7 @@ function renderMessages(){
     }
     else if(currentChat==="group" && msg.type==="group" && msg.target===currentTarget){
       addMessage(msg);
-    }
+    } else if(currentChat==="public" && msg.type==="file") addMessage(msg); // archivos en public
   });
 }
 
@@ -153,9 +149,11 @@ sendBtn.addEventListener("click", ()=>{
   const text = messageInput.value.trim();
   if(!text || !nickname) return;
 
-  if(currentChat==="public") socket.emit("chat public", text);
-  else if(currentChat==="private") socket.emit("chat private",{target:currentTarget,text});
-  else if(currentChat==="group") socket.emit("chat group",{groupName:currentTarget,text});
+  const msg = { text };
+
+  if(currentChat==="public") socket.emit("chat public", msg);
+  else if(currentChat==="private") socket.emit("chat private",{target:currentTarget,...msg});
+  else if(currentChat==="group") socket.emit("chat group",{groupName:currentTarget,...msg});
 
   messageInput.value="";
 });
@@ -212,7 +210,6 @@ function updateUnreadBadge(nameOrGroup) {
     if (li.textContent.startsWith(nameOrGroup)) {
       const oldBadge = li.querySelector(".unread-badge");
       if (oldBadge) oldBadge.remove();
-
       const count = unreadCounts[nameOrGroup];
       if (count > 0) {
         const badge = document.createElement("span");
@@ -255,22 +252,13 @@ socket.on("group list", groups=>{
   });
 });
 
-// Crear grupo
-createGroupBtn.addEventListener("click", ()=>{
-  const name = prompt("Nombre del grupo:");
-  const members = prompt("Miembros separados por coma:").split(",").map(m=>m.trim());
-  if(name && members.length>0){
-    members.push(nickname);
-    socket.emit("create group",{groupName:name,members});
-  }
-});
-
 // Cambiar de chat
 function selectChat(type, target=null){
   currentChat = type;
   currentTarget = target;
   chatTitle.textContent = target || "General";
 
+  // Resetear contador de no leídos
   if(target && unreadCounts[target]){
     delete unreadCounts[target];
     updateUnreadBadge(target);
