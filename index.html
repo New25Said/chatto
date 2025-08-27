@@ -20,13 +20,12 @@
       <span id="typing-indicator"></span>
     </div>
     <ul id="messages"></ul>
-<div id="input-area">
-  <input id="message-input" placeholder="Escribe un mensaje..." autocomplete="off"/>
-<input type="file" id="file-input" style="display:none"/>
-
-  <button id="image-btn">📎</button>
-  <button id="send-btn">➤</button>
-</div>
+    <div id="input-area">
+      <input id="message-input" placeholder="Escribe un mensaje..." autocomplete="off"/>
+      <input type="file" id="file-input" style="display:none"/>
+      <button id="image-btn">📎</button>
+      <button id="send-btn">➤</button>
+    </div>
   </div>
 </div>
 
@@ -43,8 +42,8 @@ const socket = io();
 let nickname = localStorage.getItem("nickname") || "";
 let currentChat = "public";
 let currentTarget = null;
-let allMessages = []; // Historial completo en el cliente
-let unreadCounts = {}; // Contador de mensajes no leídos
+let allMessages = [];
+let unreadCounts = {};
 
 const nicknameModal = document.getElementById("nickname-modal");
 const usernameInput = document.getElementById("username");
@@ -59,32 +58,35 @@ const createGroupBtn = document.getElementById("create-group-btn");
 const fileInput = document.getElementById("file-input");
 const fileBtn = document.getElementById("image-btn");
 
-// Abrir selector de archivos al hacer clic en el botón 📎
+// Abrir selector de archivos al hacer clic en 📎
 fileBtn.addEventListener("click", () => fileInput.click());
 
-
-// Cuando el usuario selecciona una imagen
-imageInput.addEventListener("change", () => {
-  const file = imageInput.files[0];
+// Cuando el usuario selecciona un archivo
+fileInput.addEventListener("change", () => {
+  const file = fileInput.files[0];
   if (!file) return;
 
   const reader = new FileReader();
   reader.onload = () => {
-    const dataURL = reader.result; // imagen en Base64
+    const dataURL = reader.result; // archivo en Base64
+    const payload = {
+      type: "file",
+      data: dataURL,
+      name: file.name,
+      mime: file.type
+    };
 
     if (currentChat === "public") {
-      socket.emit("chat public", { type: "image", data: dataURL });
+      socket.emit("chat public", payload);
     } else if (currentChat === "private") {
-      socket.emit("chat private", { target: currentTarget, text: "", type: "image", data: dataURL });
+      socket.emit("chat private", { target: currentTarget, text: "", ...payload });
     } else if (currentChat === "group") {
-      socket.emit("chat group", { groupName: currentTarget, text: "", type: "image", data: dataURL });
+      socket.emit("chat group", { groupName: currentTarget, text: "", ...payload });
     }
   };
   reader.readAsDataURL(file);
-
-  imageInput.value = ""; // resetear input
+  fileInput.value = "";
 });
-
 
 // Esperar conexión antes de enviar nickname guardado
 socket.on("connect", () => {
@@ -103,11 +105,13 @@ function addMessage(msg){
 
   let content = `<span class="name">${msg.name}</span>`;
 
-  if(msg.image){ // si hay imagen
+  if(msg.image){ 
     content += `<img src="${msg.image}" alt="imagen" class="chat-image"/>`;
+  } else if(msg.type === "file" && msg.data){
+    content += `<a href="${msg.data}" download="${msg.name}" class="file-link">${msg.name}</a>`;
   }
 
-  if(msg.text){ // si hay texto
+  if(msg.text){ 
     content += `<span class="text">${msg.text}</span>`;
   }
 
@@ -117,7 +121,6 @@ function addMessage(msg){
   messages.appendChild(li);
   messages.scrollTop = messages.scrollHeight;
 }
-
 
 // Filtrar y renderizar mensajes según chat activo
 function renderMessages(){
@@ -268,7 +271,6 @@ function selectChat(type, target=null){
   currentTarget = target;
   chatTitle.textContent = target || "General";
 
-  // Resetear contador de no leídos
   if(target && unreadCounts[target]){
     delete unreadCounts[target];
     updateUnreadBadge(target);
@@ -277,6 +279,6 @@ function selectChat(type, target=null){
   renderMessages();
 }
 </script>
-  <script src="notifications.js"></script>
+<script src="notifications.js"></script>
 </body>
 </html>
