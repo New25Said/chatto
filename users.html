@@ -2,26 +2,111 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>👥 Usuarios conectados</title>
-  <link rel="stylesheet" href="styles.css">
+  <title>Usuarios Registrados</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background: #f4f4f9;
+    }
+    h1 {
+      color: #333;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 10px;
+      text-align: left;
+    }
+    th {
+      background: #eee;
+    }
+    button {
+      padding: 5px 10px;
+      margin-right: 5px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .rename {
+      background: #4caf50;
+      color: white;
+    }
+    .ban {
+      background: #e53935;
+      color: white;
+    }
+  </style>
 </head>
 <body>
-  <h1>Usuarios conectados</h1>
-  <ul id="user-list"></ul>
+  <h1>Usuarios Registrados</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>Nombre</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody id="userTableBody">
+      <!-- Aquí van los usuarios -->
+    </tbody>
+  </table>
 
-  <script src="/socket.io/socket.io.js"></script>
   <script>
-    const socket = io();
-    const list = document.getElementById("user-list");
+    function loadUsers() {
+      let users = JSON.parse(localStorage.getItem("users") || "[]");
+      let tbody = document.getElementById("userTableBody");
+      tbody.innerHTML = "";
 
-    socket.on("user list", (users) => {
-      list.innerHTML = "";
-      users.forEach(u => {
-        const li = document.createElement("li");
-        li.textContent = u;
-        list.appendChild(li);
+      users.forEach((user, index) => {
+        let row = document.createElement("tr");
+
+        // Nombre
+        let nameCell = document.createElement("td");
+        nameCell.textContent = user;
+        row.appendChild(nameCell);
+
+        // Acciones
+        let actionsCell = document.createElement("td");
+
+        // Botón renombrar
+        let renameBtn = document.createElement("button");
+        renameBtn.textContent = "Renombrar";
+        renameBtn.className = "rename";
+        renameBtn.onclick = () => {
+          let newName = prompt("Nuevo nombre para " + user + ":", user);
+          if (newName && newName.trim() !== "") {
+            users[index] = newName.trim();
+            localStorage.setItem("users", JSON.stringify(users));
+            loadUsers();
+          }
+        };
+        actionsCell.appendChild(renameBtn);
+
+        // Botón banear
+        let banBtn = document.createElement("button");
+        banBtn.textContent = "Banear";
+        banBtn.className = "ban";
+        banBtn.onclick = () => {
+          if (confirm("¿Seguro que deseas banear a " + user + "?")) {
+            users.splice(index, 1); // eliminar
+            localStorage.setItem("users", JSON.stringify(users));
+            loadUsers();
+          }
+        };
+        actionsCell.appendChild(banBtn);
+
+        row.appendChild(actionsCell);
+        tbody.appendChild(row);
       });
-    });
+    }
+
+    // Cargar al abrir
+    loadUsers();
   </script>
 </body>
 </html>
